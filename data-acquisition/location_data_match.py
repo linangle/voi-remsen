@@ -3,12 +3,11 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-# folder containing python file
-BASE_DIR = Path(__file__).resolve().parent
+from paths import input_file, output_file, ensure_dirs
 
-# input / output files
-INPUT_CSV = BASE_DIR / "calhabmap.csv"
-OUTPUT_CSV = BASE_DIR / "matchup_table_sitexweek.csv"
+# input / output files (siblings: data_input vs data_output)
+INPUT_CSV = input_file("calhabmap.csv")
+OUTPUT_CSV = output_file("matchup_table_sitexweek.csv")
 
 # column to role mapping
 GROUND_TRUTH_HAZARD = {
@@ -56,25 +55,8 @@ def reduce_week(g):
 
 # build the matchup table
 def classify_pair(df, cols):
-    # none if neither column is present
-    # partial if only one is present
-    # has if both are present
-
     count_present = df[cols].notna().sum(axis=1)
-
-    return np.select(
-        [
-            count_present == 0,
-            count_present == 1,
-            count_present == 2,
-        ],
-        [
-            "none",
-            "partial",
-            "has",
-        ],
-        default="none"
-    )
+    return count_present.map({0: "none", 1: "partial", 2: "has"})
 
 def build_matchup(df):
     matchup = (
@@ -96,6 +78,7 @@ def build_matchup(df):
 
 # output
 def main():
+    ensure_dirs()
     df = load(INPUT_CSV)
     df = combine_pn(df)
     matchup = build_matchup(df)
