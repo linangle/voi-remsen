@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Phase C world-model inference (joint two-marker continuous-time HMM)
+# world-model inference (joint two-marker continuous-time HMM)
 worldmodel = ["pymc", "nutpie", "arviz"]
 
 [build-system]

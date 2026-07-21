@@ -1,17 +1,3 @@
-"""Path resolution for the voi-remsen world-model pipeline.
-
-Single shared paths module (import everywhere). Assumes this file lives at
-`src/voi_remsen/paths.py`, so `parents[2]` is the project root:
-
-    <project_root>/src/voi_remsen/paths.py
-    parents[0] = voi_remsen   parents[1] = src   parents[2] = <project_root>
-
-Data-stage convention (cookiecutter-data-science):
-    input   raw, immutable   (calHABMAP csv, CDPH xlsx)
-    interim cleaned/derived  (joint_panel.csv, toxicity_panel.csv)
-    output  final artifacts  (fitted Q, model-selection tables, figures)
-"""
-
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

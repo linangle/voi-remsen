@@ -1,14 +1,3 @@
-"""Coverage EDA: site x year data-availability heatmap.
-
-Adapted from the original `plot_coverage.py`. Background colours show calHABMAP
-availability (in-situ physical vs. water cell/toxin); a red border overlays the
-site-years that ALSO have CDPH tissue domoic-acid data — i.e. where the joint
-world model has biomass + toxicity support.
-
-Reads data/interim/{calhabmap_weekly.csv, cdph_weekly.csv}; writes
-data/output/coverage_heatmap.pdf. Exploration only — not part of the fit path.
-"""
-
 from __future__ import annotations
 
 import numpy as np
@@ -24,9 +13,6 @@ from .paths import interim_file, output_file
 
 YEARS = list(range(2005, 2027))
 
-# calHABMAP background tiers — labelled with the *specific* measurements.
-#   physical = in-situ SST + chlorophyll (measured at the pier)
-#   water hazard = Pseudo-nitzschia cell counts + particulate domoic acid (water)
 TIER_LABELS = {
     0: "no data",
     1: "in-situ physical only (SST, chlorophyll)",
@@ -35,7 +21,7 @@ TIER_LABELS = {
     4: "physical + water hazard (full week matchup)",
 }
 TIER_COLORS = ["#f0f0f0", "#c6dbef", "#fdae6b", "#a1d99b", "#31a354"]
-TISSUE_EDGE = "#d62728"   # red border overlay = CDPH tissue DA present
+TISSUE_EDGE = "#d62728"
 
 
 def _year_tier(sub):
@@ -60,7 +46,6 @@ def plot_coverage(weekly_csv=None, cdph_csv=None, out_pdf=None):
     code_to_name = m.dropna(subset=["location_name"]).drop_duplicates(
         "location_code").set_index("location_code")["location_name"].to_dict()
 
-    # CDPH tissue: weeks per (site-name, year)  -> overlay
     tis = pd.read_csv(cdph_csv, parse_dates=["week_start"])
     tis["year"] = tis["week_start"].dt.year
     tis["location_name"] = tis["location_code"].map(code_to_name)
@@ -86,7 +71,7 @@ def plot_coverage(weekly_csv=None, cdph_csv=None, out_pdf=None):
                 ax.text(j, i, str(counts[i, j]), ha="center", va="center", fontsize=6,
                         color="white" if grid[i, j] == 4 else "#333")
             nt = tissue_n.get((s, y), 0)
-            if nt > 0:  # tissue overlay: red border + small red weekly count (lower-right)
+            if nt > 0:
                 ax.add_patch(Rectangle((j - 0.5, i - 0.5), 1, 1, fill=False,
                                        edgecolor=TISSUE_EDGE, lw=1.6))
                 ax.text(j + 0.38, i + 0.36, str(nt), ha="right", va="bottom",

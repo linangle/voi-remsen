@@ -1,22 +1,3 @@
-## fit_toxicity_msm.R  --  voi-remsen world model (Phase B, msm reference)
-## ------------------------------------------------------------------------
-## Continuous-time HIDDEN multi-state Markov model of latent HAB severity,
-## observed through the CENSORED CDPH tissue domoic-acid (DA) marker.
-##
-## Method: Jackson (2011, msm), continuous-time Markov with misclassification
-##   (manual sec 1.6.1) -- hidden severity evolves via intensity matrix Q with
-##   P(dt) = expm(dt * Q) (Eq. 2), observed through a categorical emission
-##   (hmmCat). Heavy left-censoring (~90% <LOD) is absorbed as the "non-detect"
-##   category (da_cat = 1), the msm-idiomatic treatment of a detection-limited
-##   marker. K = 2..4 hidden states are scanned and compared by AIC/BIC
-##   (Kim 2022 uses BIC; Arcieri repeats inference over several K).
-##
-## This DA-only fit is the reference the joint two-marker PyMC model is validated
-## against; it is also where we learn what the toxicity marker can resolve alone.
-##
-## Run:  Rscript R/fit_toxicity_msm.R
-## In:   data/interim/toxicity_panel.csv   Out: data/output/msm_tox_*.{rds,csv}
-## ------------------------------------------------------------------------
 suppressMessages(library(msm))
 
 INTERIM <- file.path("data", "interim")
@@ -31,13 +12,8 @@ cat(sprintf("data: %d DA obs, %d sites; category counts: %s\n",
             paste(table(d$da_cat), collapse = "/")))
 
 fit_K <- function(K) {
-  ## birth-death intensity matrix (adjacent severity transitions): parsimonious
-  ## and numerically stable -- a dense Q overflows for K>=3 (the DA marker cannot
-  ## identify that many states).
   Q <- matrix(0, K, K)
   for (i in 1:K) { if (i > 1) Q[i, i-1] <- 0.3; if (i < K) Q[i, i+1] <- 0.3 }
-  ## ordered categorical emissions: low states -> mostly non-detect; high states
-  ## -> more low/closure. Anchors identifiability (avoids label switching).
   hmodel <- lapply(1:K, function(k) {
     frac <- if (K == 1) 0 else (k - 1) / (K - 1)
     pr <- c((1 - frac) * 0.88 + 0.04, 0.10 + 0.10 * frac, frac * 0.6 + 0.02)
