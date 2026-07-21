@@ -49,7 +49,7 @@ def build_sequences(panel: pd.DataFrame, sites=None):
 
         seqs.append(dict(code=code, y_cell=y_cell, cell_mask=cell_mask,
                          da_onehot=onehot, da_mask=da_mask, gaps=gaps,
-                         n=len(d)))
+                         n=len(d), week_start=wk.to_numpy()))
     return seqs
 
 
@@ -108,13 +108,20 @@ def _forward_loglik(E, gaps, pi0, pows):
 
 # model
 def build_model(seqs, K, mu_prior=None, sigma_floor=0.15, rate_prior=1.0,
-                gap_cap=52):
+                gap_cap=52, mu_sep=0.5):
     """Assemble the PyMC model over the given sequences for K latent states.
 
     gap_cap bounds how many whole-week transition powers P1^g are built. Blooms
     mix on a scale of weeks, so P1^g is effectively stationary well before a year;
     capping gaps at ~52 weeks is numerically negligible but keeps the graph small
     (a deep matmul chain is what makes compilation slow).
+
+    mu_sep is a minimum gap (log10 cells) between consecutive state means. Without
+    it, at K>=3 a state can collapse onto its neighbour (same cell mean, weakly
+    told apart by DA) -- a degenerate mode that leaves chains stuck at different
+    optima (r-hat >> 1). Two states at the same biomass level aren't identifiable
+    from the cell marker, so enforcing a floor separation is the right regulariser;
+    it is slack for the well-separated K=2 fit.
     """
     import pymc as pm
     import pytensor.tensor as pt
@@ -136,9 +143,10 @@ def build_model(seqs, K, mu_prior=None, sigma_floor=0.15, rate_prior=1.0,
         mu0 = pm.TruncatedNormal("mu0", mu=float(mu_prior[0]), sigma=1.0,
                                  lower=0.0, initval=float(max(mu_prior[0], 0.2)))
         dmu = pm.HalfNormal("dmu", sigma=1.5, shape=K - 1,
-                            initval=np.maximum(np.diff(mu_prior), 0.3))
+                            initval=np.maximum(np.diff(mu_prior) - mu_sep, 0.3))
+        gaps_mu = mu_sep + dmu                     # each gap >= mu_sep
         mu = pm.Deterministic("mu", mu0 + pt.concatenate([pt.zeros(1),
-                                                          pt.cumsum(dmu)]))
+                                                          pt.cumsum(gaps_mu)]))
         sigma = pm.Deterministic(
             "sigma", sigma_floor + pm.HalfNormal("sigma_raw", 1.0, shape=K))
         E_da = pm.Dirichlet("E_da", a=np.ones((K, 3)), shape=(K, 3))
