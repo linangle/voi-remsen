@@ -1,1 +1,17 @@
+# OS
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# Large / regenerable data
+# C-HARM NetCDF cubes (deprecated iteration-1 satellite data; kept locally, never committed)
+*.nc
+
+# ArviZ / MCMC traces
+*.netcdf
