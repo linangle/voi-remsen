@@ -30,8 +30,11 @@ def export_worldmodel(idata, K, out="worldmodel.npz"):
         Q_mean=Qs.mean(0), Q_samples=Qs,
         P_week_mean=P1s.mean(0), P_week_samples=P1s,
         mu=_flat(idata, "mu"), sigma=_flat(idata, "sigma"),
-        E_da=_flat(idata, "E_da"),
+        pi_zero=_flat(idata, "pi_zero"), E_da=_flat(idata, "E_da"),
+        pi0=_flat(idata, "pi0"),           # fitted initial state distribution
         rate_units="per_week",
+        cell_transform="log10(cells+1)",
+        da_categories="0=non-detect, 1=detected<20ppm, 2=closure>=20ppm",
     )
     path = output_file(out)
     np.savez(path, **payload)

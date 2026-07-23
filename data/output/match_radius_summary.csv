@@ -1,0 +1,3 @@
+radius_km,stations,tissue_samples_matched,median_match_km,cell_weeks,tissue_weeks,matchups,closure_weeks,site_weeks
+3.0,15,4513,0.73,6504,3412,758,66,9158
+5.0,15,4695,0.84,6504,3522,773,68,9253

@@ -15,7 +15,7 @@ import arviz as az
 import pandas as pd
 import pymc as pm
 
-from voi_remsen import paths
+from voi_remsen import config, paths
 from voi_remsen.worldmodel import build_sequences, build_model
 from voi_remsen.worldmodel.export import export_worldmodel
 from voi_remsen.worldmodel.selection import pointwise_loglik
@@ -39,7 +39,7 @@ def _max_rhat(idata):
 def main(Ks):
     panel = pd.read_csv(paths.interim_file("joint_panel.csv"),
                         parse_dates=["week_start"])
-    seqs = build_sequences(panel)
+    seqs = build_sequences(panel, sites=config.MODEL_SITES)
     print(f"sequences: {[(s['code'], s['n']) for s in seqs]}")
     print(f"total observed weeks: {sum(s['n'] for s in seqs)} | "
           f"gmax {max(int(s['gaps'].max()) for s in seqs)} wk")
@@ -65,24 +65,35 @@ def main(Ks):
     print("\n=== K-scan diagnostics ===")
     print(sel.to_string(index=False))
 
-    cmp = az.compare(traces, var_name="obs")     # LOO ranking (best first)
-    cmp.to_csv(paths.output_file("worldmodel_compare.csv"))
-    print("\n=== az.compare (PSIS-LOO) ===")
-    print(cmp.to_string())
-
-    # Only select among CONVERGED fits: LOO from unmixed chains is meaningless,
-    # and a p_loo far above the parameter count flags an unreliable estimate.
-    RHAT_MAX, PLOO_MAX = 1.05, 3 * max(Ks) ** 2
-    ok = sel[(sel.max_rhat < RHAT_MAX) & (sel.p_loo < PLOO_MAX)]
+    # Select among CONVERGED fits only. Standard criteria (max r-hat, divergences);
+    # LOO from unmixed chains is meaningless, so we never rank or save comparisons
+    # that include an unconverged fit (avoids an artifact table ranking a bad K #1).
+    # NOTE: this PSIS-LOO is over one-step forward-filter factors -- a relative
+    # in-sample fit / influence diagnostic, NOT leave-future-out forecast skill.
+    RHAT_MAX = 1.05
+    ok = sel[(sel.max_rhat < RHAT_MAX) & (sel.divergences == 0)]
     dropped = sel[~sel.K.isin(ok.K)]
     if len(dropped):
-        print("\nEXCLUDED from selection (not converged / unreliable LOO):")
-        print(dropped[["K", "max_rhat", "p_loo"]].to_string(index=False))
+        print("\nEXCLUDED (not converged; LOO not comparable):")
+        print(dropped[["K", "max_rhat", "divergences", "p_loo"]].to_string(index=False))
     if ok.empty:
         raise SystemExit("No K converged; not exporting a world model.")
+
+    conv = {f"K{int(k)}": traces[f"K{int(k)}"] for k in ok.K}
+    cmp_path = paths.output_file("worldmodel_compare.csv")
+    if len(conv) > 1:
+        cmp = az.compare(conv, var_name="obs")
+        cmp.to_csv(cmp_path)
+        print("\n=== az.compare (PSIS-LOO, converged only) ===")
+        print(cmp.to_string())
+    else:
+        if cmp_path.exists():
+            cmp_path.unlink()          # don't leave a stale multi-K ranking
+        print(f"\nonly K={int(ok.iloc[0].K)} converged; no cross-K comparison.")
+
     best = int(ok.sort_values("elpd_loo").iloc[-1].K)   # best LOO among converged
     path = export_worldmodel(traces[f"K{best}"], best)
-    print(f"\nselected K={best} (LOO-best among converged) -> {path}")
+    print(f"\nselected K={best} (converged; LOO-best among converged) -> {path}")
 
 
 if __name__ == "__main__":

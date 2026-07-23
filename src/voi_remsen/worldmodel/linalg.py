@@ -15,10 +15,15 @@ import numpy as np
 
 
 def expm_pt(A, order: int = 12, s: int = 10):
-    """expm(A) for a small square pytensor matrix (scaling-and-squaring Taylor)."""
+    """expm(A) for a small square pytensor matrix (scaling-and-squaring Taylor).
+
+    Works on a single (K,K) matrix or a batch (B,K,K): the identity uses the
+    trailing dimension and broadcasts over any leading batch axes, so the
+    seasonal model can exponentiate all 53 week-of-year generators at once.
+    """
     import pytensor.tensor as pt
 
-    n = A.shape[0]
+    n = A.shape[-1]
     As = A / (2.0 ** s)
     I = pt.eye(n)
     term = I
@@ -39,6 +44,22 @@ def expm_np(A: np.ndarray, order: int = 12, s: int = 10) -> np.ndarray:
     I = np.eye(n)
     term = I.copy()
     E = I.copy()
+    for k in range(1, order + 1):
+        term = term @ As / k
+        E = E + term
+    for _ in range(s):
+        E = E @ E
+    return E
+
+
+def expm_np_batched(A: np.ndarray, order: int = 12, s: int = 10) -> np.ndarray:
+    """Batched numpy expm over leading axes of A (..., K, K); same algorithm."""
+    A = np.asarray(A, float)
+    K = A.shape[-1]
+    As = A / (2.0 ** s)
+    I = np.eye(K)
+    term = np.broadcast_to(I, As.shape).copy()
+    E = term.copy()
     for k in range(1, order + 1):
         term = term @ As / k
         E = E + term

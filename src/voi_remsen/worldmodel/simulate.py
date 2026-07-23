@@ -16,9 +16,11 @@ from .linalg import expm_np
 _DA_MAG = {1: 0.5, 2: 5.0, 3: 30.0}   # nominal ppm per category (magnitude only)
 
 
-def simulate_panel(Q_week, mu, sigma, E_da, n_weeks=400, n_sites=3,
+def simulate_panel(Q_week, mu, sigma, pi_zero, E_da, n_weeks=400, n_sites=3,
                    p_keep=0.6, p_cell=0.7, p_da=0.5, seed=0):
-    mu, sigma, E_da = map(np.asarray, (mu, sigma, E_da))
+    """sigma is a shared scalar; pi_zero is (K,) per-state cell non-detect rate."""
+    mu, pi_zero, E_da = map(np.asarray, (mu, pi_zero, E_da))
+    sigma = float(sigma)
     P1 = expm_np(Q_week)
     K = len(mu)
     rng = np.random.default_rng(seed)
@@ -33,9 +35,13 @@ def simulate_panel(Q_week, mu, sigma, E_da, n_weeks=400, n_sites=3,
                 continue                       # whole week unobserved -> gap
             cells = clog = da = dacat = np.nan
             if rng.random() < p_cell:
-                ystar = rng.normal(mu[s], sigma[s])
-                clog = max(ystar, 0.0)         # tobit: censor at 0
-                cells = 10.0 ** clog - 1.0
+                if rng.random() < pi_zero[s]:
+                    clog = 0.0; cells = 0.0    # hurdle: exact non-detect
+                else:
+                    ystar = rng.normal(mu[s], sigma)   # truncated at 0
+                    while ystar <= 0:
+                        ystar = rng.normal(mu[s], sigma)
+                    clog = ystar; cells = 10.0 ** clog - 1.0
             if rng.random() < p_da:
                 dacat = int(rng.choice(3, p=E_da[s]) + 1)
                 da = _DA_MAG[dacat]

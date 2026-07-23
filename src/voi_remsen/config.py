@@ -8,6 +8,24 @@ CO_LOCATED_SITES = {
     "SIO": "La Jolla, Scripps Pier",
 }
 
+# The world model is anchored on a SINGLE site. Pooling the four sites shared one
+# generator/emission across very different baselines and sampling regimes, so the
+# latent states partly encoded site identity (at K=2 the state was nearly a proxy
+# for the site) and toxicity events were too sparse elsewhere to identify a hazard
+# state. Santa Cruz Wharf carries 22 of the 34 closure-level tissue observations,
+# 663 tissue weeks, and near-balanced marker coverage (667 cell vs 663 DA weeks),
+# so the joint state is informed by toxicity rather than dominated by biomass.
+# NOTE: SCW cell counts are the *seriata* group only (delicatissima is not
+# reported there) -- internally consistent, but not comparable to other sites.
+ANCHOR_SITE = "SCW"
+MODEL_SITES = [ANCHOR_SITE]
+
+# Tissue samples are matched to calHABMAP stations by COORDINATES (nearest station
+# within this radius), not by exact `Sample Site` string. Name matching silently
+# dropped tissue records whose label never equals a station name (e.g. sites
+# recorded under a county), understating coverage.
+MATCH_RADIUS_KM = 3.0
+
 PN_COLUMNS = [
     "pseudo_nitzschia_delicatissima_group_cells_l",
     "pseudo_nitzschia_seriata_group_cells_l",
@@ -38,3 +56,4 @@ INSITU_PROXY = {
 }
 
 BIOMASS_COL = "pn_total_cells_l"
+PDA_COL = "pda_water_ng_ml"   # particulate DA: observes biomass x toxin quota

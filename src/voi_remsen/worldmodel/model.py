@@ -88,14 +88,15 @@ def _forward_loglik(E, gaps, pi0, pows):
     Op (which PyMC's logp compilation cannot rewrite).
     """
     import pytensor, pytensor.tensor as pt
+    tiny = 1e-30                     # guard against all-emissions underflow -> log(0)
     a0 = pi0 * E[0]
-    c0 = a0.sum()
+    c0 = pt.maximum(a0.sum(), tiny)
     a0 = a0 / c0
 
     def step(E_t, gap_t, a_prev, pows_):
         pred = a_prev.dot(pows_[gap_t])
         a = pred * E_t
-        c = a.sum()
+        c = pt.maximum(a.sum(), tiny)
         return a / c, pt.log(c)
 
     (_, logc), _ = pytensor.scan(
@@ -147,8 +148,10 @@ def build_model(seqs, K, mu_prior=None, sigma_floor=0.15, rate_prior=1.0,
         gaps_mu = mu_sep + dmu                     # each gap >= mu_sep
         mu = pm.Deterministic("mu", mu0 + pt.concatenate([pt.zeros(1),
                                                           pt.cumsum(gaps_mu)]))
+        # ONE shared sigma for the positive log-cell part -> monotone severity.
         sigma = pm.Deterministic(
-            "sigma", sigma_floor + pm.HalfNormal("sigma_raw", 1.0, shape=K))
+            "sigma", sigma_floor + pm.HalfNormal("sigma_raw", 1.0))
+        pi_zero = pm.Beta("pi_zero", 1.0, 1.0, shape=K)   # per-state non-detect rate
         E_da = pm.Dirichlet("E_da", a=np.ones((K, 3)), shape=(K, 3))
         pi0 = pm.Dirichlet("pi0", a=np.ones(K))
 
@@ -159,7 +162,7 @@ def build_model(seqs, K, mu_prior=None, sigma_floor=0.15, rate_prior=1.0,
                 pt.as_tensor_variable(s["cell_mask"]),
                 pt.as_tensor_variable(s["da_onehot"]),
                 pt.as_tensor_variable(s["da_mask"]),
-                mu, sigma, E_da)
+                mu, sigma, pi_zero, E_da)
             gaps = np.minimum(s["gaps"], gmax).astype("int64")
             total = total + _forward_loglik(
                 E, pt.as_tensor_variable(gaps), pi0, pows)
